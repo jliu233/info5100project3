@@ -82,7 +82,7 @@
             }))
             .filter((d) => d.date && d.value !== null);
 
-          const margin = { top: 50, right: 50, bottom: 30, left: 50 };
+          const margin = { top: 80, right: 50, bottom: 60, left: 50 };
           const width = 800 - margin.left - margin.right;
           const height = 400 - margin.top - margin.bottom;
 
@@ -93,6 +93,15 @@
             .attr("height", height + margin.top + margin.bottom)
             .append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
+
+          // Add title to the graph
+          d3.select("#chart svg")
+            .append("text")
+            .attr("x", (width + margin.left + margin.right) / 2)
+            .attr("y", margin.top / 2)
+            .attr("text-anchor", "middle")
+            .style("font-size", "16px")
+            .text("Unemployment Rate vs Consumer Price Index");
 
           const xScale = d3
             .scaleTime()
@@ -113,6 +122,25 @@
             .call(d3.axisBottom(xScale));
 
           svg.append("g").call(d3.axisLeft(yScale));
+
+          // Add x-axis title
+          svg
+            .append("text")
+            .attr("text-anchor", "middle")
+            .attr("x", width / 2)
+            .attr("y", height + margin.bottom - 10)
+            .style("font-size", "12px")
+            .text("Year");
+
+          // Add y-axis title
+          svg
+            .append("text")
+            .attr("text-anchor", "middle")
+            .attr("transform", "rotate(-90)")
+            .attr("x", -height / 2)
+            .attr("y", -margin.left + 15)
+            .style("font-size", "12px")
+            .text("Rate/Index");
 
           const lineGenerator = d3
             .line()
