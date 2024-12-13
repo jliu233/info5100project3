@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive Line Graph</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+      }
+      .tooltip {
+        position: absolute;
+        background: white;
+        border: 1px solid #ccc;
+        padding: 5px;
+        display: none;
+        pointer-events: none;
+      }
+      .legend {
+        font-size: 12px;
+      }
+      .faded {
+        opacity: 0.3;
+      }
+      .saturated {
+        opacity: 1;
+      }
+      .emoji {
+        position: absolute;
+        width: 30px;
+        height: 30px;
+        display: none;
+        pointer-events: none;
+      }
+      .controls {
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="controls">
+      <label>
+        <input type="checkbox" id="toggleUnemployment" checked />
+        Show Unemployment Rate
+      </label>
+      <label>
+        <input type="checkbox" id="toggleInflation" checked />
+        Show Consumer Price Index
+      </label>
+    </div>
+    <script>
+      const unemploymentCSV = "cleaned_unemploymentRate.csv";
+      const inflationCSV = "cleaned_inflationRate.csv";
+
+      const emojiPaths = {
+        highest: "/images/melting.png",
+        lowest: "/images/happy.png",
+        secondHighest: "/images/sad.png",
+        default: "/images/soso.png",
+      };
+
+      d3.csv(unemploymentCSV).then((unemploymentData) => {
+        d3.csv(inflationCSV).then((inflationData) => {
+          const unemployment = unemploymentData
+            .map((d) => ({
+              date: d.Date ? new Date(d.Date) : null,
+              value: d.UnemploymentRate ? +d.UnemploymentRate : null,
+            }))
+            .filter((d) => d.date && d.value !== null);
+
+          const inflation = inflationData
+            .map((d) => ({
+              date: d.Date ? new Date(d.Date) : null,
+              value: d.ConsumerPriceIndex ? +d.ConsumerPriceIndex : null,
+            }))
+            .filter((d) => d.date && d.value !== null);
+
+          const margin = { top: 50, right: 50, bottom: 30, left: 50 };
+          const width = 800 - margin.left - margin.right;
+          const height = 400 - margin.top - margin.bottom;
+
+          const svg = d3
+            .select("body")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+          const legend = svg.append("g").attr("class", "legend");
+
+          legend
+            .append("rect")
+            .attr("x", 0)
+            .attr("y", -30)
+            .attr("width", 10)
+            .attr("height", 10)
+            .attr("fill", "steelblue");
+          legend
+            .append("text")
+            .attr("x", 15)
+            .attr("y", -20)
+            .text("Unemployment Rate");
+
+          legend
+            .append("rect")
+            .attr("x", 150)
+            .attr("y", -30)
+            .attr("width", 10)
+            .attr("height", 10)
+            .attr("fill", "orange");
+          legend
+            .append("text")
+            .attr("x", 165)
+            .attr("y", -20)
+            .text("Consumer Price Index");
+
+          const xScale = d3
+            .scaleTime()
+            .domain(d3.extent([...unemployment, ...inflation], (d) => d.date))
+            .range([0, width]);
+
+          const yScale = d3
+            .scaleLinear()
+            .domain([
+              0,
+              d3.max([...unemployment, ...inflation], (d) => d.value),
+            ])
+            .range([height, 0]);
+
+          svg
+            .append("g")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(xScale));
+
+          svg.append("g").call(d3.axisLeft(yScale));
+
+          const lineGenerator = d3
+            .line()
+            .x((d) => xScale(d.date))
+            .y((d) => yScale(d.value));
+
+          const unemploymentLine = svg
+            .append("path")
+            .datum(unemployment)
+            .attr("fill", "none")
+            .attr("stroke", "steelblue")
+            .attr("stroke-width", 2)
+            .attr("class", "unemployment-line line")
+            .attr("d", lineGenerator);
+
+          const inflationLine = svg
+            .append("path")
+            .datum(inflation)
+            .attr("fill", "none")
+            .attr("stroke", "orange")
+            .attr("stroke-width", 2)
+            .attr("class", "inflation-line line")
+            .attr("d", lineGenerator);
+
+          const emoji = d3.select("body").append("img").attr("class", "emoji");
+
+          const determineEmoji = (point, data) => {
+            const values = data.map((d) => d.value).sort((a, b) => b - a);
+            if (point.value === values[0]) return emojiPaths.highest;
+            if (point.value === values[1]) return emojiPaths.secondHighest;
+            if (point.value === values[values.length - 1])
+              return emojiPaths.lowest;
+            return emojiPaths.default;
+          };
+
+          const addHoverEffect = (data, color) => {
+            svg
+              .selectAll(`circle.${color}`)
+              .data(data)
+              .enter()
+              .append("circle")
+              .attr("class", `${color} point`)
+              .attr("cx", (d) => xScale(d.date))
+              .attr("cy", (d) => yScale(d.value))
+              .attr("r", 5)
+              .attr("fill", color)
+              .on("mouseover", function (event, d) {
+                d3.selectAll(".line, .point").classed("faded", true);
+                d3.select(this)
+                  .classed("faded", false)
+                  .classed("saturated", true);
+
+                emoji
+                  .attr("src", determineEmoji(d, data))
+                  .style("left", `${event.pageX}px`)
+                  .style("top", `${event.pageY - 40}px`)
+                  .style("display", "block");
+              })
+              .on("mouseout", function () {
+                d3.selectAll(".line, .point").classed("faded", false);
+                d3.select(this).classed("saturated", false);
+                emoji.style("display", "none");
+              });
+          };
+
+          addHoverEffect(unemployment, "steelblue");
+          addHoverEffect(inflation, "orange");
+
+          const toggleUnemployment =
+            document.getElementById("toggleUnemployment");
+          const toggleInflation = document.getElementById("toggleInflation");
+
+          toggleUnemployment.addEventListener("change", () => {
+            const visible = toggleUnemployment.checked;
+            d3.select(".unemployment-line").style(
+              "display",
+              visible ? "block" : "none"
+            );
+          });
+
+          toggleInflation.addEventListener("change", () => {
+            const visible = toggleInflation.checked;
+            d3.select(".inflation-line").style(
+              "display",
+              visible ? "block" : "none"
+            );
+          });
+        });
+      });
+    </script>
+  </body>
+</html>
