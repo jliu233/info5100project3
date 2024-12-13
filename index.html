@@ -8,6 +8,7 @@
     <style>
       body {
         font-family: Arial, sans-serif;
+        display: flex;
       }
       .tooltip {
         position: absolute;
@@ -34,16 +35,21 @@
         pointer-events: none;
       }
       .controls {
-        margin-bottom: 10px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        margin-left: 20px;
       }
     </style>
   </head>
   <body>
+    <div id="chart"></div>
     <div class="controls">
       <label>
         <input type="checkbox" id="toggleUnemployment" checked />
         Show Unemployment Rate
       </label>
+      <br />
       <label>
         <input type="checkbox" id="toggleInflation" checked />
         Show Consumer Price Index
@@ -81,40 +87,12 @@
           const height = 400 - margin.top - margin.bottom;
 
           const svg = d3
-            .select("body")
+            .select("#chart")
             .append("svg")
             .attr("width", width + margin.left + margin.right)
             .attr("height", height + margin.top + margin.bottom)
             .append("g")
             .attr("transform", `translate(${margin.left},${margin.top})`);
-
-          const legend = svg.append("g").attr("class", "legend");
-
-          legend
-            .append("rect")
-            .attr("x", 0)
-            .attr("y", -30)
-            .attr("width", 10)
-            .attr("height", 10)
-            .attr("fill", "steelblue");
-          legend
-            .append("text")
-            .attr("x", 15)
-            .attr("y", -20)
-            .text("Unemployment Rate");
-
-          legend
-            .append("rect")
-            .attr("x", 150)
-            .attr("y", -30)
-            .attr("width", 10)
-            .attr("height", 10)
-            .attr("fill", "orange");
-          legend
-            .append("text")
-            .attr("x", 165)
-            .attr("y", -20)
-            .text("Consumer Price Index");
 
           const xScale = d3
             .scaleTime()
@@ -159,6 +137,30 @@
             .attr("class", "inflation-line line")
             .attr("d", lineGenerator);
 
+          const addPoints = (data, color, className) => {
+            return svg
+              .selectAll(`circle.${className}`)
+              .data(data)
+              .enter()
+              .append("circle")
+              .attr("class", `${className} point`)
+              .attr("cx", (d) => xScale(d.date))
+              .attr("cy", (d) => yScale(d.value))
+              .attr("r", 5)
+              .attr("fill", color);
+          };
+
+          const unemploymentPoints = addPoints(
+            unemployment,
+            "steelblue",
+            "unemployment-point"
+          );
+          const inflationPoints = addPoints(
+            inflation,
+            "orange",
+            "inflation-point"
+          );
+
           const emoji = d3.select("body").append("img").attr("class", "emoji");
 
           const determineEmoji = (point, data) => {
@@ -170,17 +172,8 @@
             return emojiPaths.default;
           };
 
-          const addHoverEffect = (data, color) => {
-            svg
-              .selectAll(`circle.${color}`)
-              .data(data)
-              .enter()
-              .append("circle")
-              .attr("class", `${color} point`)
-              .attr("cx", (d) => xScale(d.date))
-              .attr("cy", (d) => yScale(d.value))
-              .attr("r", 5)
-              .attr("fill", color)
+          const addHoverEffect = (points, data, color) => {
+            points
               .on("mouseover", function (event, d) {
                 d3.selectAll(".line, .point").classed("faded", true);
                 d3.select(this)
@@ -200,8 +193,8 @@
               });
           };
 
-          addHoverEffect(unemployment, "steelblue");
-          addHoverEffect(inflation, "orange");
+          addHoverEffect(unemploymentPoints, unemployment, "steelblue");
+          addHoverEffect(inflationPoints, inflation, "orange");
 
           const toggleUnemployment =
             document.getElementById("toggleUnemployment");
@@ -213,11 +206,19 @@
               "display",
               visible ? "block" : "none"
             );
+            d3.selectAll(".unemployment-point").style(
+              "display",
+              visible ? "block" : "none"
+            );
           });
 
           toggleInflation.addEventListener("change", () => {
             const visible = toggleInflation.checked;
             d3.select(".inflation-line").style(
+              "display",
+              visible ? "block" : "none"
+            );
+            d3.selectAll(".inflation-point").style(
               "display",
               visible ? "block" : "none"
             );
